@@ -1,53 +1,42 @@
 # NanoClaw: Upstream Sync Skill
 
 **PR**: [qwibitai/nanoclaw #217](https://github.com/qwibitai/nanoclaw/pull/217)
-**Status**: Open (adopted by fork users; official version later shipped in [#372](https://github.com/qwibitai/nanoclaw/pull/372))
+**Status**: Merged
+**Reviewer**: gavrielc
 
 ## Problem
 
-NanoClaw (~16k stars) is a customizable AI agent platform where users fork and modify skills. When upstream ships fixes or new features, users with customized forks have no efficient way to sync. One user reported spending $15 in API credits trying to merge manually — Claude scans the full repo and refactors unrelated code during the process.
+NanoClaw is a customizable AI agent platform where users fork and modify skills. When upstream ships updates, there's no good way to sync a customized fork. One user reported spending $15 in API credits trying to merge manually because Claude kept scanning the full repo and refactoring unrelated code.
 
-Issue [#181](https://github.com/qwibitai/nanoclaw/issues/181) ("Upgrade Skill") was opened as a feature request. Maintainer triaged it as valid.
+Feature request: [#181](https://github.com/qwibitai/nanoclaw/issues/181).
 
-## PR #217: Workflow playbook
+## What I built
 
-A Claude Code skill (`.claude/skills/update-nanoclaw/SKILL.md`) that gives Claude a strict, low-token playbook for upstream sync:
+A Claude Code skill (`.claude/skills/update-nanoclaw/SKILL.md`) that gives Claude a strict playbook for upstream sync:
 
-- **Preflight**: checks clean working tree, sets up `upstream` remote, detects branch name
-- **Backup**: timestamped branch + tag before any changes (`backup/pre-update-<hash>-<timestamp>`)
-- **Preview**: `git log` + `git diff` against merge base, changes categorized by type (skills/source/config)
-- **Update paths**: user picks merge (default), cherry-pick, rebase, or abort
-- **Conflict preview**: dry-run merge (`git merge --no-commit --no-ff`) before committing
-- **Resolution**: only opens conflicted files, never refactors surrounding code
-- **Validation**: `npm run build` + `npm test`
-- **Rollback**: backup tag printed at end of every run
+- Preflight checks (clean tree, upstream remote, branch detection)
+- Backup branch + tag before any changes
+- Preview via `git log` + `git diff` against merge base
+- User picks merge (default), cherry-pick, rebase, or abort
+- Dry-run merge before committing
+- Only opens files with actual conflicts — no refactoring surrounding code
+- Runs `npm run build` + `npm test` after
+- Prints backup tag at the end for rollback
 
-Key design constraint: minimize token usage by using `git status`, `git log`, `git diff` for everything and only opening files with actual conflicts.
+Main design goal: minimize token usage by sticking to git commands for everything and only opening files that actually have conflicts.
+
+I also submitted [#317](https://github.com/qwibitai/nanoclaw/pull/317), a script-based alternative with shell scripts, test sandbox, and CI workflow. The maintainer preferred the simpler markdown-only approach and merged #217 instead — "we should keep it simple and only add scripts where it's really warranted."
 
 ## Adoption
 
-Maintainer gavrielc responded: "thanks for contributing! This meets a critical need. I will aim to review today and will also ask some people in discord to try on their clone."
+A couple fork users adopted it before it was even reviewed:
+- timmoser/Shelby pushed a commit referencing #217
+- TerrifiedBug/nanotars pushed a commit referencing #217
 
-Fork users adopted it before any official version existed:
-- **timmoser/Shelby**: pushed commit referencing #217 — "improve upstream sync skill with safety net and validation"
-- **TerrifiedBug/nanotars**: pushed commit referencing #217 — "skill: add /update-nanoclaw for upstream sync"
-
-## PR #317: Script-driven architecture
-
-Follow-up alternative with shell scripts instead of inline markdown:
-
-- 9 scripts with deterministic exit codes and `KEY=VALUE` machine-readable output
-- Test sandbox (`test-sandbox.sh`) creating isolated git environments
-- 7 test scenarios: merge-conflict, clean-merge, no-upstream, bad-upstream, no-main-master, cherry-conflict, validate-fail
-- CI workflow (`.github/workflows/update-nanoclaw-skill-tests.yml`)
-
-## Note
-
-The maintainer later shipped an official `/update` skill in [#372](https://github.com/qwibitai/nanoclaw/pull/372). #217 was the first implementation of this feature.
+After merging, the maintainer removed the old `/update` skill and replaced it with this one.
 
 ## Links
 
-- PR #217 (playbook): https://github.com/qwibitai/nanoclaw/pull/217
-- PR #317 (scripts): https://github.com/qwibitai/nanoclaw/pull/317
-- Official version #372: https://github.com/qwibitai/nanoclaw/pull/372
+- PR #217 (merged): https://github.com/qwibitai/nanoclaw/pull/217
+- PR #317 (closed, script alternative): https://github.com/qwibitai/nanoclaw/pull/317
 - Feature request: https://github.com/qwibitai/nanoclaw/issues/181
