@@ -6,18 +6,15 @@
 
 ## What I built
 
-Tool approval support for the Vercel AI adapter in Pydantic AI ([#4279](https://github.com/pydantic/pydantic-ai/issues/4279)):
+Tool approval support for the Vercel AI adapter ([#4279](https://github.com/pydantic/pydantic-ai/issues/4279)). The adapter needed to handle the human-in-the-loop flow: when an agent returns `DeferredToolRequests`, stream `tool-approval-request` events to the frontend, then when the frontend sends back `approval-responded` parts, parse them into `ToolApproved`/`ToolDenied` results and feed them back into the next agent run.
 
-- Emit `ToolApprovalRequestChunk` when an agent returns `DeferredToolRequests`
-- Parse `approval-responded` UI parts into `DeferredToolResults`
-- Auto-wire parsed results in `run_stream_native` when not explicitly provided
-- Tests for streaming, parsing, approved/denied flows
+Built the full flow: streaming emission of approval request chunks, Pydantic models for parsing Vercel's `approval-responded` schema (both builtin and dynamic tool variants), auto-wiring of parsed results in `run_stream_native()` so users don't have to manually pass `deferred_tool_results`, and tests covering the whole thing.
 
-Closed as a dup of [#3772](https://github.com/pydantic/pydantic-ai/pull/3772) by bendrucker who was working on the same thing.
+Closed as a dup of [#3772](https://github.com/pydantic/pydantic-ai/pull/3772) by bendrucker who was building the same feature.
 
 ## The review
 
-After my PR was closed I reviewed bendrucker's implementation. The `VercelAIAdapter` was overriding `dispatch_request` entirely — copy-pasting the full base class method just to inject `deferred_tool_results`. Any future change to `UIAdapter.dispatch_request` would need to be duplicated.
+After my PR was closed I went through bendrucker's implementation. The problem: `VercelAIAdapter` was overriding `dispatch_request` in its entirety, copying the full base class method just to inject `deferred_tool_results`. That means any future change to `UIAdapter.dispatch_request` would need a parallel update in the Vercel adapter or it'd silently drift.
 
 [Suggested](https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3880128902) overriding `run_stream_native()` with `super()` delegation instead:
 
@@ -27,6 +24,8 @@ def run_stream_native(self, *, deferred_tool_results=None, **kwargs):
         deferred_tool_results = self.deferred_tool_results
     return super().run_stream_native(deferred_tool_results=deferred_tool_results, **kwargs)
 ```
+
+The adapter only touches the one thing it needs to and delegates everything else.
 
 bendrucker refactored to use this. His [commit](https://github.com/pydantic/pydantic-ai/pull/3772/commits/de2a4bcf) is titled "Eliminate dispatch_request duplication in VercelAIAdapter" and his [reply](https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3882273449): "Ok, all comments are addressed! Back to kwargs + super for the method overrides."
 

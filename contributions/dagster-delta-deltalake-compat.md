@@ -6,24 +6,21 @@
 
 ## The bug
 
-dagster-delta was pinned to `deltalake<=1.2.0` ([#48](https://github.com/ASML-Labs/dagster-delta/issues/48)) because newer versions broke the test suite. The release workflow was also broken — artifacts landed in the wrong directory so publishing silently failed.
+dagster-delta was pinned to `deltalake<=1.2.0` ([#48](https://github.com/ASML-Labs/dagster-delta/issues/48)) because newer versions broke the test suite. The release workflow was also broken: `uv build` writes artifacts to repo-root `dist/` but validation and publishing expected them in the workspace subdirectory, so publishing silently failed.
 
 ## The fix
 
-deltalake 1.2.1+ changed Arrow table behavior in a few ways:
+deltalake 1.2.1+ changed how Arrow tables come back in three ways, each needing a different fix:
 
-1. **Types**: columns come back as `string_view` instead of `string`, so direct table equality checks fail even though the data is the same
-2. **Row ordering**: results aren't deterministically ordered anymore
-3. **Partition columns**: can show up at different positions in the schema
+**`string_view` vs `string` types** - columns now come back as `string_view`, so direct PyArrow table equality fails even though the data is identical. Fixed by round-tripping tables through `pa.table(table.to_pydict())` to normalize the types.
 
-Fixed across 4 test files with different strategies depending on the assertion pattern:
-- Round-tripped tables through `pa.table(t.to_pydict())` to normalize away type differences
-- Wrapped `to_pylist()` checks in `sorted()` for order-independent comparison
-- Used `.select(cols)` to align column ordering
+**Nondeterministic row ordering** - result sets aren't ordered the same way anymore. Wrapped list assertions in `sorted()`.
 
-Bumped the dep constraint from `deltalake<=1.2.0` to `deltalake>=1.2.1` in both `pyproject.toml` files (lockfile resolved to 1.4.2).
+**Partition column positioning** - partition columns can show up at different positions in the schema. Used `.select(cols)` to align column order before comparison.
 
-Also fixed the release workflow — `uv build` defaults to repo-root `dist/` but the validation script and `uv publish` expect `${{ inputs.working_directory }}/dist`. Added `--out-dir dist` so they all agree.
+The heaviest test file needed all three strategies plus explicit `.sort_by()` on both sides of comparisons. The others mostly just needed `sorted()` wrappers.
+
+Bumped the dep from `<=1.2.0` to `>=1.2.1` in both `pyproject.toml` files (lockfile resolved to 1.4.2). Fixed the release workflow by adding `--out-dir dist` to `uv build`.
 
 ## Links
 

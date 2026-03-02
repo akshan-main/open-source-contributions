@@ -12,28 +12,21 @@ Feature request: [#181](https://github.com/qwibitai/nanoclaw/issues/181).
 
 ## What I built
 
-A Claude Code skill (`.claude/skills/update-nanoclaw/SKILL.md`) that gives Claude a strict playbook for upstream sync:
+A Claude Code skill that gives Claude a strict playbook for upstream sync instead of letting it freelance. The whole point is to keep token usage low by using git commands for everything and only opening files that actually have conflicts.
 
-- Preflight checks (clean tree, upstream remote, branch detection)
-- Backup branch + tag before any changes
-- Preview via `git log` + `git diff` against merge base
-- User picks merge (default), cherry-pick, rebase, or abort
-- Dry-run merge before committing
-- Only opens files with actual conflicts — no refactoring surrounding code
-- Runs `npm run build` + `npm test` after
-- Prints backup tag at the end for rollback
+The flow: check for clean working tree and set up the upstream remote, create a timestamped backup branch + tag, show what upstream changed (grouped by skills/source/config), let the user pick merge/cherry-pick/rebase/abort, do a dry-run merge to preview conflicts before committing, resolve only conflicted files (no refactoring surrounding code), run build + tests, print rollback instructions.
 
-Main design goal: minimize token usage by sticking to git commands for everything and only opening files that actually have conflicts.
+If rebase hits more than 3 rounds of conflicts it aborts and recommends merge instead. If the build fails after merging, it only tries to fix things clearly caused by the merge, not random stuff.
 
-I also submitted [#317](https://github.com/qwibitai/nanoclaw/pull/317), a script-based alternative with shell scripts, test sandbox, and CI workflow. The maintainer preferred the simpler markdown-only approach and merged #217 instead — "we should keep it simple and only add scripts where it's really warranted."
+I also submitted [#317](https://github.com/qwibitai/nanoclaw/pull/317), a script-based alternative with shell scripts, a test sandbox, and CI. The maintainer preferred the simpler markdown-only approach: "we should keep it simple and only add scripts where it's really warranted." Merged #217, closed #317.
 
 ## Adoption
 
-A couple fork users adopted it before it was even reviewed:
+Fork users started using it before it was even reviewed:
 - timmoser/Shelby pushed a commit referencing #217
 - TerrifiedBug/nanotars pushed a commit referencing #217
 
-After merging, the maintainer removed the old `/update` skill and replaced it with this one.
+After merging, the maintainer removed the old `/update` skill and replaced it with this one. Other forks (index-engine/nanoclaw) picked it up within hours.
 
 ## Links
 
