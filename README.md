@@ -1,6 +1,6 @@
 # Open Source Contributions
 
-PRs I've opened across various projects.
+PRs I've opened across various projects (that were succesful)
 
 ## Highlights
 
