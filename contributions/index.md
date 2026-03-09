@@ -9,3 +9,4 @@
 | pydantic/pydantic-ai | [#4283](https://github.com/pydantic/pydantic-ai/pull/4283) + [#3772 review](https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3880128902) | Review adopted | [pydantic-ai-tool-approval.md](pydantic-ai-tool-approval.md) |
 | qwibitai/nanoclaw | [#217](https://github.com/qwibitai/nanoclaw/pull/217) | Merged | [nanoclaw-update.md](nanoclaw-update.md) |
 | qwibitai/nanoclaw | [#705](https://github.com/qwibitai/nanoclaw/pull/705) | Merged | [nanoclaw-sender-allowlist.md](nanoclaw-sender-allowlist.md) |
+| qwibitai/nanoclaw | [#817](https://github.com/qwibitai/nanoclaw/pull/817) | Merged | [nanoclaw-compact.md](nanoclaw-compact.md) |

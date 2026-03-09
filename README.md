@@ -9,6 +9,7 @@ PRs I've opened across various projects (that were succesful)
 - **Led to merged fix**: [huggingface/trl #5064](https://github.com/huggingface/trl/pull/5064) - GRPO multimodal training was crashing because `prepare_multimodal_messages` was being called on already-templated string prompts. Found two more bugs in the same code path while I was in there. Maintainer's merged fix ([#5067](https://github.com/huggingface/trl/pull/5067)) links to this PR as its only context.
 - **Merged**: [qwibitai/nanoclaw #217](https://github.com/qwibitai/nanoclaw/pull/217) - Claude Code skill for syncing customized forks with upstream. Preflight, backup, dry-run conflict preview, merge/cherry-pick/rebase/abort, validation. Fork users started using it before it was even reviewed. Maintainer replaced the old `/update` skill with it.
 - **Merged**: [qwibitai/nanoclaw #705](https://github.com/qwibitai/nanoclaw/pull/705) - sender-based access control at the orchestrator level so denied senders never invoke the agent. Two modes (trigger: store messages but gate activation, drop: don't store at all), per-chat overrides. Originally submitted as a skill, maintainer asked for it in core instead.
+- **Merged**: [qwibitai/nanoclaw #817](https://github.com/qwibitai/nanoclaw/pull/817) - `/compact` session command for manual context compaction. Auth-gated to main group or device owner, processes pre-compact messages first so context isn't lost, forwards the SDK's built-in `/compact` as a string prompt (not MessageStream). Two-layer implementation: orchestrator handles auth + batching, agent-runner handles SDK integration + compact boundary tracking.
 - **Review adopted**: [pydantic/pydantic-ai #3772 review](https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3880128902) - built tool approval for Vercel AI adapter independently, PR closed as dup. Reviewed the competing PR and pointed out it was copy-pasting the entire base class `dispatch_request`. Suggested `super()` delegation instead, which they adopted.
 
 ## Contributions
@@ -22,6 +23,7 @@ PRs I've opened across various projects (that were succesful)
 | pydantic/pydantic-ai | [#4283](https://github.com/pydantic/pydantic-ai/pull/4283) + [#3772 review](https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3880128902) | Review adopted | Built tool approval for Vercel AI adapter, then reviewed competing PR and suggested arch fix that shipped | [detail](contributions/pydantic-ai-tool-approval.md) |
 | qwibitai/nanoclaw | [#217](https://github.com/qwibitai/nanoclaw/pull/217) | Merged | Upstream sync skill for customized forks | [detail](contributions/nanoclaw-update.md) |
 | qwibitai/nanoclaw | [#705](https://github.com/qwibitai/nanoclaw/pull/705) | Merged | Sender allowlist for per-chat access control, pre-agent filtering | [detail](contributions/nanoclaw-sender-allowlist.md) |
+| qwibitai/nanoclaw | [#817](https://github.com/qwibitai/nanoclaw/pull/817) | Merged | /compact session command — auth-gated context compaction with pre-compact batching | [detail](contributions/nanoclaw-compact.md) |
 
 ## Notes
 
