@@ -5,7 +5,7 @@
 
 ## Change
 
-- Profiled the QwenImage eager inference path and traced repeated CPU-to-GPU transfers inside RoPE frequency lookup.
+- Profiled the QwenImage eager inference path in Perfetto and traced repeated CPU-to-GPU transfers inside RoPE frequency lookup.
 - Added `_get_device_freqs(device)` in both `QwenEmbedRope` and `QwenEmbedLayer3DRope`.
 - Used `@lru_cache_unless_export(maxsize=None)` so device copies are reused without breaking export paths.
 - Replaced repeated per-step `.to(device)` calls in:
@@ -31,7 +31,7 @@ def _get_device_freqs(self, device: torch.device) -> tuple[torch.Tensor, torch.T
     return self.pos_freqs.to(device), self.neg_freqs.to(device)
 ```
 
-The first call materializes device copies; later denoising steps reuse them. The computation is unchanged, only the repeated transfer and synchronization are removed.
+The first call materializes device copies; later denoising steps reuse them. The computation is unchanged, only the repeated transfer and synchronization are removed. That is the reason this was a safe library-level optimization: narrow hot-path change, measured runtime win, and no semantic behavior change.
 
 ## Links
 

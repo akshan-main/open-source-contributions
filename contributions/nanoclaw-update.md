@@ -22,6 +22,7 @@
 - The failure mode was real: users could spend significant API credits while Claude scanned the whole project, guessed at conflicts, and rewrote unrelated code.
 - The skill turns updates into a bounded git workflow: inspect diffs, choose an update path, resolve only actual conflicts, validate, and keep a rollback handle.
 - Maintainers get a supportable update path for forked installs instead of repeatedly debugging ad hoc manual merges.
+- The design treats the hard part as operational safety, not just git syntax: reduce the files the model opens, preserve user changes, and make rollback available before anything risky happens.
 - The maintainer called it a critical need, which matches the problem: customized installs need updates without losing local changes.
 
 ## Code notes

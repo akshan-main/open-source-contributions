@@ -1,6 +1,6 @@
 # Open Source Contributions
 
-Open-source work in ML infrastructure, inference performance, agent runtimes, and developer reliability. The common thread is systems work where the useful part is not only the patch, but finding the right boundary: GPU sync in a hot path, image-vs-latent dimensions in video conditioning, message authorization before agent startup, or fork updates that should stay git-native instead of turning into a repo-wide model session.
+Open-source work in ML infrastructure, inference performance, agent runtimes, and developer reliability. The work clusters around high-friction failure points: wasted GPU time, brittle training paths, leaky modular boundaries, unsafe agent triggers, expensive fork updates, and partial-failure behavior. The common thread is finding the right control point, whether that is a GPU sync in a hot path, image-vs-latent dimensions in video conditioning, message authorization before agent startup, or fork updates that should stay git-native instead of becoming a repo-wide model session.
 
 ## Quick Navigate
 
@@ -16,45 +16,45 @@ Open-source work in ML infrastructure, inference performance, agent runtimes, an
 
 ## Selected Work
 
-### 1. LTX Video in Modular Diffusers
-
-**PR**: [huggingface/diffusers #13378](https://github.com/huggingface/diffusers/pull/13378) (Merged)
-
-**What changed**: I added the LTX Video modular pipeline in Diffusers: T2V and I2V block graphs, denoise-loop blocks, VAE/text encode-decode steps, pachifier support, `LTXAutoBlocks`, registry/export wiring, dependency dummies, and modular workflow tests.
-
-**What it enables**: LTX users can now work with the pipeline as inspectable stages instead of a single monolithic call: text encoding, image conditioning, latent preparation, denoising, decoding, and pachifying are exposed as blocks. That makes it practical to debug one stage, reuse loaded components, swap or extend only the part being researched, and route T2V/I2V through `LTXAutoBlocks` based on inputs without maintaining separate forked pipeline code.
-
-Detail: [contributions/diffusers-modular-ltx-video-pipeline.md](contributions/diffusers-modular-ltx-video-pipeline.md)
-
-### 2. QwenImage-Family Eager Performance
+### 1. QwenImage-Family Performance Fix
 
 **PR**: [huggingface/diffusers #13406](https://github.com/huggingface/diffusers/pull/13406) (Merged)
 
-**What changed**: **What changed**: I profiled the QwenImage transformer path in Perfetto, traced repeated RoPE frequency CPU-to-GPU transfers, and replaced per-forward `.to(device)` calls with cached device freqs via `lru_cache_unless_export` in both RoPE classes. Previously, each transformer forward could rematerialize the RoPE frequency tensors on GPU, adding unnecessary synchronization overhead.
+**What changed**: I profiled the QwenImage transformer path in Perfetto, traced repeated RoPE frequency CPU-to-GPU transfers in the eager forward path, and replaced per-forward `.to(device)` calls with cached device frequencies via `lru_cache_unless_export` in both RoPE classes. The computation and outputs stay the same; the patch removes repeated transfer and synchronization work from the hot path.
 
-**What it enables**: Users get faster default eager inference without changing outputs or requiring `torch.compile`. The eager profile removes about `76ms` of `cudaStreamSynchronize` per `transformer_forward` call, roughly `~1.5s` at 20 inference steps. Because the same transformer is shared, the fix improves speed for `QwenImage`, `QwenImageEdit`, `QwenImageEditPlus`, and `QwenImageLayered` users; follow-up QwenImageEdit profiling also showed where the remaining syncs actually live.
+**What it enables**: Default eager inference gets faster without requiring `torch.compile` or changing model behavior. The profile traced about `76ms` of `cudaStreamSynchronize` per `transformer_forward` to repeated RoPE device transfers. At 20 inference steps, that is roughly `~1.5s` less synchronization overhead. Because the optimized transformer path is shared, the fix applies across `QwenImage`, `QwenImageEdit`, `QwenImageEditPlus`, and `QwenImageLayered`.
 
 Detail: [contributions/diffusers-qwenimage-rope-device-cache.md](contributions/diffusers-qwenimage-rope-device-cache.md)
 
-### 3. NanoClaw Runtime Sender Gating
+### 2. NanoClaw Runtime Sender Gating
 
 **PR**: [qwibitai/nanoclaw #705](https://github.com/qwibitai/nanoclaw/pull/705) (Merged)
 
 **What changed**: I added sender allowlist enforcement before NanoClaw starts the agent: host config loading, per-chat rules, trigger/drop modes, owner bypass through `is_from_me`, DB projection updates, orchestrator checks, and focused tests.
 
-**What it enables**: Group owners can keep NanoClaw in shared chats without letting every participant spend tokens or trigger work. In trigger mode, untrusted messages can still be retained as context while only approved senders wake the agent; in drop mode, denied messages never enter storage. The control point is before container startup, where it actually protects cost and runtime behavior.
+**What it enables**: Shared-chat owners can separate “visible in context” from “allowed to trigger work.” Denied senders can be blocked before container startup, model invocation, token spend, and tool execution; stricter deployments can also drop denied messages before storage. The important part is the layer: this is enforced at the orchestrator boundary, not as a prompt instruction after the agent has already been invoked.
 
 Detail: [contributions/nanoclaw-sender-allowlist.md](contributions/nanoclaw-sender-allowlist.md)
 
-### 4. NanoClaw Low-Token Fork Updates
+### 3. NanoClaw Low-Token Fork Updates
 
 **PR**: [qwibitai/nanoclaw #217](https://github.com/qwibitai/nanoclaw/pull/217) (Merged)
 
 **What changed**: I wrote `/update-nanoclaw`, a Claude Code skill for updating customized NanoClaw forks with clean-tree checks, upstream remote setup, backup branch/tag creation, upstream diff bucketing, dry-run conflict preview, merge/cherry-pick/rebase/abort choices, validation, and rollback instructions.
 
-**What it enables**: Fork users can keep local customizations and still take upstream fixes without turning each update into a broad, token-heavy merge session. The skill keeps Claude on a git-native path: inspect commits, open only conflicted files, choose merge/cherry-pick/rebase intentionally, validate, and keep a rollback point before any update begins. The maintainer called this a critical and important PR.
+**What it enables**: Customized NanoClaw users can take upstream fixes without reinstalling, sacrificing local changes, or burning tokens on a model trying to reason across the whole repo. The skill keeps updates on a bounded git path: preview upstream drift, categorize changed files, dry-run conflicts, open only real conflict files, choose merge/cherry-pick/rebase intentionally, validate, and keep a rollback point. The maintainer called it a critical need.
 
 Detail: [contributions/nanoclaw-update.md](contributions/nanoclaw-update.md)
+
+### 4. LTX Video in Modular Diffusers
+
+**PR**: [huggingface/diffusers #13378](https://github.com/huggingface/diffusers/pull/13378) (Merged)
+
+**What changed**: I added the LTX Video modular pipeline in Diffusers: T2V and I2V block graphs, denoise-loop blocks, VAE/text encode-decode steps, pachifier support, `LTXAutoBlocks`, registry/export wiring, dependency dummies, and modular workflow tests.
+
+**What it enables**: LTX users can work with the pipeline as inspectable stages instead of a single monolithic call: text encoding, image conditioning, latent preparation, denoising, decoding, and pachifying are exposed as blocks. That makes it practical to debug one stage, reuse loaded components, swap or extend only the part being researched, and route T2V/I2V through `LTXAutoBlocks` based on inputs without maintaining separate forked pipeline code.
+
+Detail: [contributions/diffusers-modular-ltx-video-pipeline.md](contributions/diffusers-modular-ltx-video-pipeline.md)
 
 ### 5. NanoClaw `/compact` Session Command
 
@@ -76,9 +76,9 @@ Detail: [contributions/nanoclaw-compact.md](contributions/nanoclaw-compact.md)
 
 | Project | PR | What changed | User/maintainer value | Status | Detail |
 |---|---|---|---|---|---|
-| huggingface/diffusers | [#13406](https://github.com/huggingface/diffusers/pull/13406) | Cached QwenImage RoPE freqs on device in the shared transformer path | Faster eager QwenImage-family generation without output changes or requiring users to rely on `torch.compile` to hide the sync | Merged | [detail](contributions/diffusers-qwenimage-rope-device-cache.md) |
+| huggingface/diffusers | [#13406](https://github.com/huggingface/diffusers/pull/13406) | Cached QwenImage RoPE freqs on device in the shared transformer path | Removes measured eager-mode synchronization stalls from a shared QwenImage-family hot path without output changes or requiring `torch.compile` | Merged | [detail](contributions/diffusers-qwenimage-rope-device-cache.md) |
 
-## Video Output Bug Fix
+## Video Pipeline Correctness
 
 | Project | PR | What changed | User/maintainer value | Status | Detail |
 |---|---|---|---|---|---|
@@ -88,7 +88,7 @@ Detail: [contributions/nanoclaw-compact.md](contributions/nanoclaw-compact.md)
 
 | Project | PR | What changed | User/maintainer value | Status | Detail |
 |---|---|---|---|---|---|
-| qwibitai/nanoclaw | [#705](https://github.com/qwibitai/nanoclaw/pull/705) | Added sender allowlist enforcement before agent invocation, including trigger/drop modes, per-chat rules, owner bypass, DB projection changes, and tests | Shared-chat deployments can keep context from passive members while limiting who can trigger paid agent work | Merged | [detail](contributions/nanoclaw-sender-allowlist.md) |
+| qwibitai/nanoclaw | [#705](https://github.com/qwibitai/nanoclaw/pull/705) | Added sender allowlist enforcement before agent invocation, including trigger/drop modes, per-chat rules, owner bypass, DB projection changes, and tests | Shared-chat deployments can keep passive context while blocking untrusted senders before agent startup, token spend, and tool execution | Merged | [detail](contributions/nanoclaw-sender-allowlist.md) |
 | qwibitai/nanoclaw | [#817](https://github.com/qwibitai/nanoclaw/pull/817) | Added reusable session-command handling for `/compact`, with auth checks, pre-compact batching, raw SDK slash-command execution, and compact-boundary tracking | Long-running chat sessions can be compacted safely, without losing same-poll messages or letting untrusted users disrupt active work | Merged | [detail](contributions/nanoclaw-compact.md) |
 | qwibitai/nanoclaw | [#1086](https://github.com/qwibitai/nanoclaw/pull/1086) | Added read-only `/capabilities` and `/status` skills gated to the main channel | Operators can answer “what can this bot do?” and “is the runtime healthy?” from chat without granting write-capable diagnostics | Merged | [detail](contributions/nanoclaw-capabilities-status-skills.md) |
 
@@ -96,7 +96,7 @@ Detail: [contributions/nanoclaw-compact.md](contributions/nanoclaw-compact.md)
 
 | Project | PR | What changed | User/maintainer value | Status | Detail |
 |---|---|---|---|---|---|
-| qwibitai/nanoclaw | [#217](https://github.com/qwibitai/nanoclaw/pull/217) | Added `/update-nanoclaw`: a git-first update skill with backups, upstream diff preview, conflict dry-run, merge/cherry-pick/rebase choices, validation, and rollback | Fork users can take upstream fixes repeatedly while keeping local customizations recoverable and avoiding repo-wide token burn | Merged | [detail](contributions/nanoclaw-update.md) |
+| qwibitai/nanoclaw | [#217](https://github.com/qwibitai/nanoclaw/pull/217) | Added `/update-nanoclaw`: a git-first update skill with backups, upstream diff preview, conflict dry-run, merge/cherry-pick/rebase choices, validation, and rollback | Customized fork users can take upstream fixes through a bounded merge workflow instead of spending tokens on broad, ad hoc repo surgery | Merged | [detail](contributions/nanoclaw-update.md) |
 | modelcontextprotocol/python-sdk | [#2038](https://github.com/modelcontextprotocol/python-sdk/pull/2038) | Threaded `Context.request_id` into `report_progress()` as `related_request_id` and added regression coverage | MCP clients can show progress for long-running streamable-HTTP tools on the correct request stream instead of dropping updates | Merged | [detail](contributions/mcp-python-sdk-progress.md) |
 | ASML-Labs/dagster-delta | [#54](https://github.com/ASML-Labs/dagster-delta/pull/54) | Updated deltalake compatibility assertions for Arrow/schema/order changes and fixed release builds to write artifacts into `dist` | Maintainers can upgrade deltalake and publish releases without tests failing on storage representation details or missing build artifacts | Merged | [detail](contributions/dagster-delta-deltalake-compat.md) |
 
@@ -118,12 +118,12 @@ Detail: [contributions/nanoclaw-compact.md](contributions/nanoclaw-compact.md)
 | Theme | Project | PR | What changed | User/maintainer value | Status | Detail |
 |---|---|---|---|---|---|---|
 | Modular Diffusers | huggingface/diffusers | [#13378](https://github.com/huggingface/diffusers/pull/13378) | LTX Video modular pipeline with T2V/I2V blocks, auto workflow routing, exports, and tests | Researchers can customize LTX at block boundaries, route T2V/I2V automatically, and avoid copying an entire video pipeline for one experiment | Merged | [detail](contributions/diffusers-modular-ltx-video-pipeline.md) |
-| Performance Engineering | huggingface/diffusers | [#13406](https://github.com/huggingface/diffusers/pull/13406) | QwenImage RoPE device cache in the shared transformer | QwenImage-family users get faster eager inference without behavior changes; maintainers get one hot-path fix shared by all variants | Merged | [detail](contributions/diffusers-qwenimage-rope-device-cache.md) |
+| Performance Engineering | huggingface/diffusers | [#13406](https://github.com/huggingface/diffusers/pull/13406) | QwenImage RoPE device cache in the shared transformer | QwenImage-family users avoid repeated CPU-to-GPU RoPE transfers in eager inference; maintainers get one behavior-preserving hot-path fix shared by all variants | Merged | [detail](contributions/diffusers-qwenimage-rope-device-cache.md) |
 | Video Pipeline Correctness | huggingface/diffusers | [#13440](https://github.com/huggingface/diffusers/pull/13440) | HunyuanVideo 1.5 I2V latent-vs-pixel dimension fix | I2V conditioning respects the requested image size instead of silently using latent dimensions for image preprocessing | Merged | [detail](contributions/diffusers-hunyuan15-i2v-pixel-resolution-fix.md) |
-| Agent Runtime | qwibitai/nanoclaw | [#705](https://github.com/qwibitai/nanoclaw/pull/705) | Sender allowlist before agent invocation | Group owners can separate “visible in context” from “allowed to trigger work,” protecting token spend in shared chats | Merged | [detail](contributions/nanoclaw-sender-allowlist.md) |
+| Agent Runtime | qwibitai/nanoclaw | [#705](https://github.com/qwibitai/nanoclaw/pull/705) | Sender allowlist before agent invocation | Group owners can separate “visible in context” from “allowed to trigger work,” blocking unwanted activations before inference starts | Merged | [detail](contributions/nanoclaw-sender-allowlist.md) |
 | Agent Runtime | qwibitai/nanoclaw | [#817](https://github.com/qwibitai/nanoclaw/pull/817) | Reusable `/compact` session-command path | Users can compact long sessions safely from chat; maintainers get a clean base for future session commands | Merged | [detail](contributions/nanoclaw-compact.md) |
 | Agent Runtime | qwibitai/nanoclaw | [#1086](https://github.com/qwibitai/nanoclaw/pull/1086) | Read-only `/capabilities` and `/status` skills | Operators can diagnose runtime capability and health without handing the agent a write-capable instruction | Merged | [detail](contributions/nanoclaw-capabilities-status-skills.md) |
-| Developer Tooling | qwibitai/nanoclaw | [#217](https://github.com/qwibitai/nanoclaw/pull/217) | Git-native `/update-nanoclaw` fork-update skill | Customized fork users can take upstream fixes with bounded conflict resolution, validation, and rollback | Merged | [detail](contributions/nanoclaw-update.md) |
+| Developer Tooling | qwibitai/nanoclaw | [#217](https://github.com/qwibitai/nanoclaw/pull/217) | Git-native `/update-nanoclaw` fork-update skill | Customized fork users can take upstream fixes through previewed diffs, real conflict files, validation, and rollback instead of repo-wide model guessing | Merged | [detail](contributions/nanoclaw-update.md) |
 | Developer Tooling | modelcontextprotocol/python-sdk | [#2038](https://github.com/modelcontextprotocol/python-sdk/pull/2038) | `related_request_id` progress routing | MCP clients can show progress for long-running tools on the correct streamable-HTTP request | Merged | [detail](contributions/mcp-python-sdk-progress.md) |
 | Developer Tooling | ASML-Labs/dagster-delta | [#54](https://github.com/ASML-Labs/dagster-delta/pull/54) | deltalake compatibility fixes plus release artifact output path | Maintainers can upgrade storage dependencies and publish releases without brittle schema/order assertions blocking them | Merged | [detail](contributions/dagster-delta-deltalake-compat.md) |
 | Training Reliability | huggingface/trl | [#5064](https://github.com/huggingface/trl/pull/5064) | GRPO multimodal crash analysis across prompt format, dtype, and reward callback paths | VLM training bugs became separable fixes instead of a vague “GRPO is broken” report | Open; prompt guard landed in [#5067](https://github.com/huggingface/trl/pull/5067) | [detail](contributions/trl-grpo-multimodal-prompts.md) |

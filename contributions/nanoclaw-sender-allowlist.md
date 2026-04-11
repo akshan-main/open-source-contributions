@@ -18,7 +18,8 @@
 - Group owners can run NanoClaw in shared chats without letting every participant trigger paid model work.
 - Trigger mode supports “visible in context but not allowed to wake the bot,” which is useful for group conversations where not every sender should have operator power.
 - Drop mode supports stricter deployments where denied messages should not be stored at all.
-- The security boundary is enforced before container startup and model invocation, not in a prompt after the agent has already launched.
+- The security boundary is enforced before container startup, model invocation, token spend, and tool execution, not in a prompt after the agent has already launched.
+- This matters architecturally because the policy is enforced at the deterministic orchestrator layer rather than relying on the model to obey an instruction after the expensive work has already started.
 
 ## Code notes
 
