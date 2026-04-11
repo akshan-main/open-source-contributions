@@ -1,26 +1,36 @@
-# Dagster-Delta: deltalake >=1.2.1 Compatibility
+# Dagster-Delta: deltalake Compatibility and Release Output
 
 **PR**: [ASML-Labs/dagster-delta #54](https://github.com/ASML-Labs/dagster-delta/pull/54)
 **Status**: Merged
-**Reviewer**: ion-elgreco
 
-## The bug
+## Change
 
-dagster-delta was pinned to `deltalake<=1.2.0` ([#48](https://github.com/ASML-Labs/dagster-delta/issues/48)) because newer versions broke the test suite. The release workflow was also broken: `uv build` writes artifacts to repo-root `dist/` but validation and publishing expected them in the workspace subdirectory, so publishing silently failed.
+- Updated test expectations for newer `deltalake` / Arrow behavior.
+- Normalized table comparisons where `string_view` and `string` differences made equality brittle.
+- Sorted outputs where row ordering was no longer deterministic.
+- Aligned partition columns before comparisons where newer behavior returned a different column order.
+- Bumped deltalake constraints in both `pyproject.toml` files.
+- Fixed release artifact output by changing the release build to `uv build --out-dir dist`.
 
-## The fix
+## What it enables
 
-deltalake 1.2.1+ changed how Arrow tables come back in three ways, each needing a different fix:
+- Maintainers can upgrade deltalake without the test suite failing on storage-layer representation changes that do not change the actual data.
+- Release publishing can find the artifacts it expects because the build now writes to `dist`.
+- The test suite becomes a better signal: it checks data correctness while tolerating row ordering, schema representation, and partition-column differences introduced by newer deltalake behavior.
 
-**`string_view` vs `string` types** - columns now come back as `string_view`, so direct PyArrow table equality fails even though the data is identical. Fixed by round-tripping tables through `pa.table(table.to_pydict())` to normalize the types.
+## Code notes
 
-**Nondeterministic row ordering** - result sets aren't ordered the same way anymore. Wrapped list assertions in `sorted()`.
+The heaviest compatibility path had to handle three independent changes at once:
 
-**Partition column positioning** - partition columns can show up at different positions in the schema. Used `.select(cols)` to align column order before comparison.
+- **Arrow representation**: rebuild tables through `pa.table(table.to_pydict())` before equality checks.
+- **Row order**: sort both expected and actual values when storage order is not part of the contract.
+- **Partition columns**: select columns in the expected order before asserting equality.
 
-The heaviest test file needed all three strategies plus explicit `.sort_by()` on both sides of comparisons. The others mostly just needed `sorted()` wrappers.
+The release workflow fix is intentionally direct:
 
-Bumped the dep from `<=1.2.0` to `>=1.2.1` in both `pyproject.toml` files (lockfile resolved to 1.4.2). Fixed the release workflow by adding `--out-dir dist` to `uv build`.
+```yaml
+run: uv build --out-dir dist
+```
 
 ## Links
 

@@ -1,35 +1,42 @@
-# NanoClaw: Upstream Sync Skill
+# NanoClaw: Low-Token Updates for Customized Forks
 
 **PR**: [qwibitai/nanoclaw #217](https://github.com/qwibitai/nanoclaw/pull/217)
 **Status**: Merged
-**Reviewer**: gavrielc
 
-## Problem
+## Change
 
-NanoClaw is a customizable AI agent platform where users fork and modify skills. When upstream ships updates, there's no good way to sync a customized fork. One user reported spending $15 in API credits trying to merge manually because Claude kept scanning the full repo and refactoring unrelated code.
+- Added `/update-nanoclaw`, a Claude Code skill for updating customized NanoClaw forks.
+- Required a clean worktree before any update work starts.
+- Added upstream remote discovery/setup and branch detection.
+- Created a rollback point with both backup branch and tag before touching user code.
+- Previewed upstream commits and changed files from the merge base.
+- Bucketed upstream changes into skills, source, build/config, and other files so risk is visible before merging.
+- Offered merge, cherry-pick, rebase, or abort instead of forcing one update strategy.
+- Added dry-run conflict preview before the real merge path.
+- Instructed Claude to open only conflicted files and avoid unrelated refactors.
+- Ended with build/test validation and explicit rollback instructions.
 
-Feature request: [#181](https://github.com/qwibitai/nanoclaw/issues/181).
+## What it enables
 
-## What I built
+- Users with customized NanoClaw installs can keep taking upstream fixes without reinstalling or sacrificing local changes.
+- The failure mode was real: users could spend significant API credits while Claude scanned the whole project, guessed at conflicts, and rewrote unrelated code.
+- The skill turns updates into a bounded git workflow: inspect diffs, choose an update path, resolve only actual conflicts, validate, and keep a rollback handle.
+- Maintainers get a supportable update path for forked installs instead of repeatedly debugging ad hoc manual merges.
+- The maintainer called it a critical need, which matches the problem: customized installs need updates without losing local changes.
 
-A Claude Code skill that gives Claude a strict playbook for upstream sync instead of letting it freelance. The whole point is to keep token usage low by using git commands for everything and only opening files that actually have conflicts.
+## Code notes
 
-The flow: check for clean working tree and set up the upstream remote, create a timestamped backup branch + tag, show what upstream changed (grouped by skills/source/config), let the user pick merge/cherry-pick/rebase/abort, do a dry-run merge to preview conflicts before committing, resolve only conflicted files (no refactoring surrounding code), run build + tests, print rollback instructions.
+The skill is instruction-driven and intentionally git-first:
 
-If rebase hits more than 3 rounds of conflicts it aborts and recommends merge instead. If the build fails after merging, it only tries to fix things clearly caused by the merge, not random stuff.
-
-I also submitted [#317](https://github.com/qwibitai/nanoclaw/pull/317), a script-based alternative with shell scripts, a test sandbox, and CI. The maintainer preferred the simpler markdown-only approach: "we should keep it simple and only add scripts where it's really warranted." Merged #217, closed #317.
-
-## Adoption
-
-Fork users started using it before it was even reviewed:
-- timmoser/Shelby pushed a commit referencing #217
-- TerrifiedBug/nanotars pushed a commit referencing #217
-
-After merging, the maintainer removed the old `/update` skill and replaced it with this one. Other forks (index-engine/nanoclaw) picked it up within hours.
+- `git status --porcelain` stops dirty-tree updates.
+- `git merge-base`, `git log`, and `git diff --name-only` explain upstream drift without opening files.
+- Backup branch and tag are created before merge/rebase/cherry-pick work.
+- Dry-run merge lists conflicts before committing to the update path.
+- Conflict resolution is scoped to conflict markers, not surrounding refactors.
+- Rollback is a concrete `git reset --hard <backup-tag>` path.
 
 ## Links
 
-- PR #217 (merged): https://github.com/qwibitai/nanoclaw/pull/217
-- PR #317 (closed, script alternative): https://github.com/qwibitai/nanoclaw/pull/317
+- PR: https://github.com/qwibitai/nanoclaw/pull/217
+- Alternate script-based proposal: https://github.com/qwibitai/nanoclaw/pull/317
 - Feature request: https://github.com/qwibitai/nanoclaw/issues/181

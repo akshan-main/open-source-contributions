@@ -1,22 +1,29 @@
-# Pydantic AI: Tool Approval + Architecture Review
+# Pydantic AI: Vercel Tool Approval and Adapter Design
 
-**PR**: [pydantic/pydantic-ai #4283](https://github.com/pydantic/pydantic-ai/pull/4283) (closed as dup)
+**PR**: [pydantic/pydantic-ai #4283](https://github.com/pydantic/pydantic-ai/pull/4283) (closed as duplicate)
 **Review**: [Comment on #3772](https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3880128902)
-**Status**: PR closed as dup; review suggestion adopted in merged [#3772](https://github.com/pydantic/pydantic-ai/pull/3772)
+**Status**: Review recommendation adopted in merged [#3772](https://github.com/pydantic/pydantic-ai/pull/3772)
 
-## What I built
+## Change
 
-Tool approval support for the Vercel AI adapter ([#4279](https://github.com/pydantic/pydantic-ai/issues/4279)). The adapter needed to handle the human-in-the-loop flow: when an agent returns `DeferredToolRequests`, stream `tool-approval-request` events to the frontend, then when the frontend sends back `approval-responded` parts, parse them into `ToolApproved`/`ToolDenied` results and feed them back into the next agent run.
+- Built a Vercel tool-approval implementation in #4283 covering:
+  - approval-request streaming,
+  - approval response parsing into approved/denied deferred tool results,
+  - automatic wiring into native streaming,
+  - end-to-end approval tests.
+- After #4283 was closed as a duplicate, reviewed the accepted PR and pointed out a smaller adapter design.
+- Suggested injecting `deferred_tool_results` through `run_stream_native()` and delegating to `super()` instead of copying the full base dispatch method.
 
-Built the full flow: streaming emission of approval request chunks, Pydantic models for parsing Vercel's `approval-responded` schema (both builtin and dynamic tool variants), auto-wiring of parsed results in `run_stream_native()` so users don't have to manually pass `deferred_tool_results`, and tests covering the whole thing.
+## What it enables
 
-Closed as a dup of [#3772](https://github.com/pydantic/pydantic-ai/pull/3772) by bendrucker who was building the same feature.
+- Pydantic AI users get Vercel tool approval behavior without the adapter carrying a copied version of base request-dispatch logic.
+- Maintainers keep the protocol-specific customization close to the stream-native entry point where deferred tool results are injected.
+- Future base adapter changes are less likely to create hidden drift in the Vercel adapter.
+- The accepted PR moved back to `kwargs` plus `super()` for method overrides after the review thread.
 
-## The review
+## Review note
 
-After my PR was closed I went through bendrucker's implementation. The problem: `VercelAIAdapter` was overriding `dispatch_request` in its entirety, copying the full base class method just to inject `deferred_tool_results`. That means any future change to `UIAdapter.dispatch_request` would need a parallel update in the Vercel adapter or it'd silently drift.
-
-[Suggested](https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3880128902) overriding `run_stream_native()` with `super()` delegation instead:
+The suggested shape was:
 
 ```python
 def run_stream_native(self, *, deferred_tool_results=None, **kwargs):
@@ -25,9 +32,7 @@ def run_stream_native(self, *, deferred_tool_results=None, **kwargs):
     return super().run_stream_native(deferred_tool_results=deferred_tool_results, **kwargs)
 ```
 
-The adapter only touches the one thing it needs to and delegates everything else.
-
-bendrucker refactored to use this. His [commit](https://github.com/pydantic/pydantic-ai/pull/3772/commits/de2a4bcf) is titled "Eliminate dispatch_request duplication in VercelAIAdapter" and his [reply](https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3882273449): "Ok, all comments are addressed! Back to kwargs + super for the method overrides."
+The point was not only fewer lines. It was keeping the customization at the point where deferred tool results enter the stream, rather than duplicating a broader dispatch path that would drift as the base adapter evolves.
 
 ## Links
 
@@ -35,4 +40,4 @@ bendrucker refactored to use this. His [commit](https://github.com/pydantic/pyda
 - Review comment: https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3880128902
 - Adoption reply: https://github.com/pydantic/pydantic-ai/pull/3772#issuecomment-3882273449
 - Merged PR: https://github.com/pydantic/pydantic-ai/pull/3772
-- Issue: https://github.com/pydantic/pydantic-ai/issues/4279
+- Feature issue: https://github.com/pydantic/pydantic-ai/issues/4279

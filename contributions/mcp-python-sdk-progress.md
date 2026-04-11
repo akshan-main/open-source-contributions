@@ -1,20 +1,24 @@
-# MCP Python SDK: Fix Progress Notification Routing
+# MCP Python SDK: Progress Notification Routing
 
 **PR**: [modelcontextprotocol/python-sdk #2038](https://github.com/modelcontextprotocol/python-sdk/pull/2038)
 **Status**: Merged
-**Reviewer**: maxisbey
 
-## The bug
+## Change
 
-Progress notifications from `Context.report_progress()` were silently dropped on the streamable HTTP transport. Any long-running tool that called `report_progress()`, the client just never got the update. Open since [#953](https://github.com/modelcontextprotocol/python-sdk/issues/953), about 8 months.
+- Passed `related_request_id=self.request_id` from `Context.report_progress()` into `send_progress_notification()`.
+- Updated existing progress-token assertions for the new argument.
+- Added regression coverage proving `Context.report_progress()` carries the originating request ID.
 
-Became a CI blocker when [#2002](https://github.com/modelcontextprotocol/python-sdk/pull/2002) added `related_request_id` to the progress notification protocol but didn't wire it into `report_progress()`, breaking all 20 test matrix jobs.
+## What it enables
 
-## The fix
+- MCP clients using streamable HTTP can show progress for long-running tools on the correct request stream.
+- Tool authors can call `report_progress()` and expect the transport to preserve the relationship between the progress event and the request that started the work.
+- Without `related_request_id`, clients can miss progress entirely even though the server emitted it.
+- The maintainer confirmed the code fix and tied it to the broader request-ID threading issue in the SDK.
 
-The streamable HTTP transport routes progress notifications by matching `related_request_id` to the originating request's SSE stream. `report_progress()` wasn't passing this field, so the transport couldn't route it anywhere.
+## Code notes
 
-The fix wires `self.request_id` into the `send_progress_notification()` call:
+The important call path is small but protocol-critical:
 
 ```python
 await self._session.send_progress_notification(
@@ -22,16 +26,14 @@ await self._session.send_progress_notification(
     progress=progress,
     total=total,
     message=message,
-    related_request_id=self.request_id,  # added
+    related_request_id=self.request_id,
 )
 ```
 
-Updated existing test assertions that broke from the new argument, and added a new test that constructs a `ServerRequestContext` with a known request ID, calls `report_progress()`, and verifies the ID makes it through to `send_progress_notification`.
-
-The reviewer noted that `ProgressContext.progress()` in `shared/progress.py` has the same problem, now tracked in [#2021](https://github.com/modelcontextprotocol/python-sdk/issues/2021).
+The regression test constructs a `ServerRequestContext` with `request_id="req-abc-123"` and asserts that `report_progress()` forwards it.
 
 ## Links
 
 - PR: https://github.com/modelcontextprotocol/python-sdk/pull/2038
-- Original bug: https://github.com/modelcontextprotocol/python-sdk/issues/953
-- Broader tracking issue: https://github.com/modelcontextprotocol/python-sdk/issues/2021
+- Original issue: https://github.com/modelcontextprotocol/python-sdk/issues/953
+- Related tracking: https://github.com/modelcontextprotocol/python-sdk/issues/2021

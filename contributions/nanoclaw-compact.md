@@ -1,39 +1,41 @@
-# NanoClaw: /compact Session Command
+# NanoClaw: `/compact` Session Command
 
 **PR**: [qwibitai/nanoclaw #817](https://github.com/qwibitai/nanoclaw/pull/817)
 **Status**: Merged
-**Reviewer**: gavrielc
 
-## Problem
+## Change
 
-Long-running NanoClaw sessions accumulate context until the agent starts losing track of earlier conversation. The Claude Agent SDK has a built-in `/compact` slash command, but NanoClaw's architecture (orchestrator → container → SDK) means slash commands can't just be typed into a chat — the orchestrator intercepts all messages and wraps them in XML before forwarding.
+- Added `/compact` as an auth-gated session command.
+- Extracted command parsing, authorization, cursor handling, and pre-compact processing into `session-commands.ts`.
+- Routed `/compact` through the SDK-recognized raw string prompt path instead of normal formatted chat messages.
+- Added pre-compact batching so messages that arrive before `/compact` in the same poll are committed to session context first.
+- Added compact-boundary tracking to detect whether compaction actually completed.
+- Added transcript archival hook support before compaction.
 
-[#322](https://github.com/qwibitai/nanoclaw/issues/322).
+## What it enables
 
-## What I built
+- Users can keep long NanoClaw sessions usable from chat instead of needing an out-of-band reset or manual intervention.
+- `/compact` changes session state; sending it through the normal message stream can leave it as literal text instead of an SDK slash command.
+- Same-poll batching prevents a normal message immediately before `/compact` from being erased from useful context.
+- Unauthorized users cannot use `/compact` to disrupt active work.
+- Maintainers get a reusable command path for future session commands such as `/clear`, without piling more logic into the main orchestrator file.
 
-A skill package that adds `/compact` as a session command. The implementation spans two layers:
+## Code notes
 
-**Orchestrator layer** (`session-commands.ts`):
-- `extractSessionCommand()` parses `/compact` from messages (with or without trigger prefix), rejects partial matches and messages with extra text
-- `isSessionCommandAllowed()` gates access — main group (self-chat) or device owner (`is_from_me`) only. Untrusted senders get a denial message if they're allowed to interact, or silent consumption if not
-- `handleSessionCommand()` orchestrates the whole flow: processes pre-compact messages first so they're in the session context before compaction, then forwards `/compact` to a fresh container
-- Pre-compact batching matters because if a user sends "summarize this" then "/compact" in the same polling interval, without handling the summary first it gets wiped by compaction
+### Orchestrator side
 
-**Agent-runner layer** (container side):
-- `KNOWN_SESSION_COMMANDS` whitelist prevents accidental interception of user messages that start with `/`
-- Slash commands use `query({ prompt: "/compact" })` with a string prompt directly — not `MessageStream`, not array format. The SDK only recognizes slash commands at conversation start
-- Strips `allowedTools` and `mcpServers` since compaction doesn't need tool access
-- Tracks `compact_boundary` system event to confirm the SDK actually compacted, warns if not observed
-- PreCompact hook archives the full transcript to `conversations/` before the SDK compacts it
+- `extractSessionCommand()` recognizes supported session commands after trigger-prefix stripping.
+- `isSessionCommandAllowed()` gates commands to trusted contexts.
+- `handleSessionCommand()` handles auth, same-poll batching, command execution, cursor movement, and denial behavior through injected dependencies.
 
-The maintainer's review asked about reusing `runQuery` for slash commands and dropping pre-compact batching. I explained why both would break: `runQuery` uses `MessageStream` (array format) which the SDK doesn't recognize as a slash command, and dropping pre-compact batching causes data loss in the narrow window where messages arrive in the same polling batch as `/compact`.
+### Agent-runner side
 
-He also suggested extracting session command interception from inline `index.ts` into a separate `handleSessionCommand()` in `session-commands.ts` — I did that in a follow-up commit, which cleaned up ~100 inline lines into a deps-interface pattern.
-
-The infrastructure (`session-commands.ts`, `KNOWN_SESSION_COMMANDS`, interception points) is designed so future session commands just add their entry and implement their logic.
+- Known session commands are intercepted before the normal query loop.
+- `/compact` is sent as `query({ prompt: "/compact" })`, because the SDK only recognizes it as a slash command in that form.
+- Tool fields are stripped from compaction-only runs.
+- `compact_boundary` is observed so completion is not inferred blindly.
 
 ## Links
 
-- PR #817 (merged): https://github.com/qwibitai/nanoclaw/pull/817
+- PR: https://github.com/qwibitai/nanoclaw/pull/817
 - Issue: https://github.com/qwibitai/nanoclaw/issues/322
