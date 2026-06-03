@@ -5,6 +5,7 @@
 - [Modular Diffusers](#modular-diffusers)
 - [Performance Engineering](#performance-engineering)
 - [Video Pipeline Correctness](#video-pipeline-correctness)
+- [Test Architecture Refactoring](#test-architecture-refactoring)
 - [Agent Runtime](#agent-runtime)
 - [Developer Tooling](#developer-tooling)
 - [Training Reliability](#training-reliability)
@@ -16,6 +17,8 @@
 | Project | PR | What changed | User/maintainer value | Status | Detail |
 |---|---|---|---|---|---|
 | huggingface/diffusers | [#13378](https://github.com/huggingface/diffusers/pull/13378) | Added the LTX modular pipeline package with T2V/I2V block graphs, `LTXAutoBlocks`, registry/exports, dependency dummies, and tests | LTX users can inspect, run, replace, or extend individual pipeline stages instead of copying the whole video pipeline to customize one step | Merged | [diffusers-modular-ltx-video-pipeline.md](diffusers-modular-ltx-video-pipeline.md) |
+| huggingface/diffusers | [#13389](https://github.com/huggingface/diffusers/pull/13389) | Added the HunyuanVideo 1.5 modular pipeline with T2V and I2V block graphs, registry/exports, dependency dummies, and tests; parity verified at MAD `0.000000` against both standard pipelines | HunyuanVideo 1.5 users can run T2V or I2V as inspectable stages and swap one stage without copying the whole video pipeline | Merged | [diffusers-modular-hunyuanvideo15-pipeline.md](diffusers-modular-hunyuanvideo15-pipeline.md) |
+| huggingface/diffusers | [#13498](https://github.com/huggingface/diffusers/pull/13498) + [#13663](https://github.com/huggingface/diffusers/pull/13663) | Added the Ernie-Image modular pipeline (`ErnieImageAutoBlocks`), verified parity (MAD `0.000033`), then fixed review findings on prompt-enhancer skipping, VAE epsilon, and latent-output handling | Ernie-Image users get a stage-based pipeline that matches the standard one on conditional steps, normalization, and output contracts | Merged | [diffusers-modular-ernie-image-pipeline.md](diffusers-modular-ernie-image-pipeline.md) |
 
 ## Performance Engineering
 
@@ -28,6 +31,12 @@
 | Project | PR | What changed | User/maintainer value | Status | Detail |
 |---|---|---|---|---|---|
 | huggingface/diffusers | [#13440](https://github.com/huggingface/diffusers/pull/13440) | Renamed latent shape variables in HunyuanVideo 1.5 I2V so latent dimensions no longer overwrite requested pixel `height`/`width` | I2V users get conditioning based on the image resolution they requested, not a silent latent-size preprocessing path | Merged | [diffusers-hunyuan15-i2v-pixel-resolution-fix.md](diffusers-hunyuan15-i2v-pixel-resolution-fix.md) |
+
+## Test Architecture Refactoring
+
+| Project | PR | What changed | User/maintainer value | Status | Detail |
+|---|---|---|---|---|---|
+| huggingface/diffusers | [#13849](https://github.com/huggingface/diffusers/pull/13849), [#13845](https://github.com/huggingface/diffusers/pull/13845), [#13840](https://github.com/huggingface/diffusers/pull/13840), [#13835](https://github.com/huggingface/diffusers/pull/13835), [#13834](https://github.com/huggingface/diffusers/pull/13834), [#13826](https://github.com/huggingface/diffusers/pull/13826) | Migrated 12 model test suites (11 autoencoders plus the Sana transformer) from the old `unittest` classes to the shared config-plus-mixin structure, with seeded inputs and pytest assertions | Model tests follow one structure across suites, with each concern in its own class and deterministic inputs, while model-specific skips and `@slow` integration tests stay intact | Merged | [diffusers-model-test-mixin-migration.md](diffusers-model-test-mixin-migration.md) |
 
 ## Agent Runtime
 
@@ -63,8 +72,11 @@
 | Theme | Project | PR | What changed | User/maintainer value | Status | Detail |
 |---|---|---|---|---|---|---|
 | Modular Diffusers | huggingface/diffusers | [#13378](https://github.com/huggingface/diffusers/pull/13378) | LTX Video modular pipeline with T2V/I2V blocks, auto workflow routing, exports, and tests | Researchers can customize LTX at block boundaries, route T2V/I2V automatically, and avoid copying an entire video pipeline for one experiment | Merged | [diffusers-modular-ltx-video-pipeline.md](diffusers-modular-ltx-video-pipeline.md) |
+| Modular Diffusers | huggingface/diffusers | [#13389](https://github.com/huggingface/diffusers/pull/13389) | HunyuanVideo 1.5 modular pipeline with T2V/I2V blocks, exports, and tests, parity verified at MAD `0.000000` | HunyuanVideo 1.5 users can run and customize T2V or I2V at block boundaries instead of copying the whole video pipeline | Merged | [diffusers-modular-hunyuanvideo15-pipeline.md](diffusers-modular-hunyuanvideo15-pipeline.md) |
+| Modular Diffusers | huggingface/diffusers | [#13498](https://github.com/huggingface/diffusers/pull/13498) + [#13663](https://github.com/huggingface/diffusers/pull/13663) | Ernie-Image modular pipeline with verified parity, plus review-finding fixes to prompt-enhancer skipping, VAE epsilon, and latent output | Ernie-Image users get a stage-based pipeline that matches the standard one on conditional steps, normalization, and output contracts | Merged | [diffusers-modular-ernie-image-pipeline.md](diffusers-modular-ernie-image-pipeline.md) |
 | Performance Engineering | huggingface/diffusers | [#13406](https://github.com/huggingface/diffusers/pull/13406) | QwenImage RoPE device cache in the shared transformer | QwenImage-family users avoid repeated CPU-to-GPU RoPE transfers in eager inference; maintainers get one behavior-preserving hot-path fix shared by all variants | Merged | [diffusers-qwenimage-rope-device-cache.md](diffusers-qwenimage-rope-device-cache.md) |
 | Video Pipeline Correctness | huggingface/diffusers | [#13440](https://github.com/huggingface/diffusers/pull/13440) | HunyuanVideo 1.5 I2V latent-vs-pixel dimension fix | I2V conditioning respects the requested image size instead of silently using latent dimensions for image preprocessing | Merged | [diffusers-hunyuan15-i2v-pixel-resolution-fix.md](diffusers-hunyuan15-i2v-pixel-resolution-fix.md) |
+| Test Architecture Refactoring | huggingface/diffusers | [#13849](https://github.com/huggingface/diffusers/pull/13849), [#13845](https://github.com/huggingface/diffusers/pull/13845), [#13840](https://github.com/huggingface/diffusers/pull/13840), [#13835](https://github.com/huggingface/diffusers/pull/13835), [#13834](https://github.com/huggingface/diffusers/pull/13834), [#13826](https://github.com/huggingface/diffusers/pull/13826) | 12 model test suites migrated to the shared config-plus-mixin structure across six PRs | Model tests follow one structure with each concern in its own class and deterministic seeded inputs, while model-specific skips and `@slow` tests stay intact | Merged | [diffusers-model-test-mixin-migration.md](diffusers-model-test-mixin-migration.md) |
 | Agent Runtime | qwibitai/nanoclaw | [#705](https://github.com/qwibitai/nanoclaw/pull/705) | Sender allowlist before agent invocation | Group owners can separate “visible in context” from “allowed to trigger work,” blocking unwanted activations before inference starts | Merged | [nanoclaw-sender-allowlist.md](nanoclaw-sender-allowlist.md) |
 | Agent Runtime | qwibitai/nanoclaw | [#817](https://github.com/qwibitai/nanoclaw/pull/817) | Reusable `/compact` session-command path | Users can compact long sessions safely from chat; maintainers get a clean base for future session commands | Merged | [nanoclaw-compact.md](nanoclaw-compact.md) |
 | Agent Runtime | qwibitai/nanoclaw | [#1086](https://github.com/qwibitai/nanoclaw/pull/1086) | Read-only `/capabilities` and `/status` skills | Operators can diagnose runtime capability and health without handing the agent a write-capable instruction | Merged | [nanoclaw-capabilities-status-skills.md](nanoclaw-capabilities-status-skills.md) |
