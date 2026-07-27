@@ -1,6 +1,6 @@
 # Open Source Contributions
 
-Open-source work in ML infrastructure, inference performance, agent runtimes, and developer reliability. The work clusters around high-friction failure points: wasted GPU time, brittle training paths, leaky modular boundaries, unsafe agent triggers, expensive fork updates, and partial-failure behavior. The common thread is finding the right control point, whether that is a GPU sync in a hot path, image-vs-latent dimensions in video conditioning, message authorization before agent startup, or fork updates that should stay git-native instead of becoming a repo-wide model session.
+Open-source work in ML infrastructure, inference performance, agent runtimes, and developer reliability. The work clusters around high-friction failure points: wasted GPU time, brittle training paths, leaky modular boundaries, unsafe agent triggers, expensive fork updates, and partial-failure behavior. The common thread is finding the right control point, whether that is a GPU sync in a hot path or message authorization before agent startup. I am in the 98th percentile of contributors to HuggingFace Diffusers (Top 20 contributors). I have received a Codex for open source for my contributions to nanoclaw.
 
 ## Quick Navigate
 
